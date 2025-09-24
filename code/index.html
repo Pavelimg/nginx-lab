@@ -1,9 +1,47 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>My First Docker Site</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Главная страница</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border: 1px solid #007bff;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        a:hover {
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+        }
+        .navigation {
+            margin: 20px 0;
+        }
+    </style>
 </head>
 <body>
-    <h1>Hello from Docker & Nginx 🚀</h1>
+    <div class="container">
+        <h1>Главная страница</h1>
+        <p>Это основная HTML страница в Docker контейнере с nginx.</p>
+        <a href="page2.html">Перейти на вторую страницу</a>
+    </div>
 </body>
 </html>
