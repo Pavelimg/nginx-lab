@@ -34,9 +34,5 @@ docker-compose up -d --build
 
 ```screenshots/``` — все скриншоты
 
-![Alt text](screenshots/Снимок экрана 2025-09-24 221653.png?raw=true "Проверяем версию docker")
-![Alt text](screenshots/Снимок экрана 2025-09-24 222354.png?raw=true "Nginx запущен")
-![Alt text](screenshots/Снимок экрана 2025-09-24 224256.png?raw=true "Добавлен HTML")
-
 ✅ Результат
 Сервер в Docker успешно запущен, Nginx отдаёт мою HTML-страницу.
