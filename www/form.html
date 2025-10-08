@@ -149,6 +149,35 @@
             margin-top: 5px;
         }
         
+        .result {
+            margin-top: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #2575fc;
+            display: none;
+        }
+        
+        .result h3 {
+            color: #2575fc;
+            margin-bottom: 15px;
+        }
+        
+        .result-item {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eaeaea;
+        }
+        
+        .result-label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .result-value {
+            color: #333;
+        }
+        
         @media (max-width: 600px) {
             .form-row {
                 flex-direction: column;
@@ -266,12 +295,17 @@
                 
                 <button type="submit" class="submit-btn">Зарегистрироваться на конференцию</button>
             </form>
+            
+            <div id="result" class="result">
+                <h3>Ваши данные для регистрации:</h3>
+                <div id="resultContent"></div>
+            </div>
         </div>
     </div>
 
     <script>
-        document.getElementById('conferenceForm').addEventListener('submit', function(event) {
-            event.preventDefault();
+        document.getElementById('conferenceForm').addEventListener('submit', function(e) {
+            e.preventDefault();
             
             // Сбор данных формы
             const formData = new FormData(this);
@@ -284,15 +318,72 @@
                 return;
             }
             
+            // Обработка данных формы
+            const fullName = this.fullName.value;
+            const email = this.email.value;
+            const birthYear = this.birthYear.value;
+            const section = this.section.options[this.section.selectedIndex].text;
+            const participation = document.querySelector('input[name="participation"]:checked').value;
+            const participationText = getParticipationText(participation);
+            const certificate = this.certificate.checked ? 'Да' : 'Нет';
+            const newsletter = this.newsletter.checked ? 'Да' : 'Нет';
+            
+            // Вывод результата в alert
+            alert(`Спасибо за регистрацию, ${fullName}!\n\nВаши данные:\n- Email: ${email}\n- Год рождения: ${birthYear}\n- Секция: ${section}\n- Форма участия: ${participationText}\n- Сертификат: ${certificate}\n- Рассылка: ${newsletter}\n\nМы свяжемся с вами в ближайшее время!`);
+            
+            // Вывод результата на страницу
+            const resultDiv = document.getElementById('result');
+            const resultContent = document.getElementById('resultContent');
+            
+            resultContent.innerHTML = `
+                <div class="result-item">
+                    <span class="result-label">ФИО:</span>
+                    <span class="result-value">${fullName}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Email:</span>
+                    <span class="result-value">${email}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Год рождения:</span>
+                    <span class="result-value">${birthYear}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Секция:</span>
+                    <span class="result-value">${section}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Форма участия:</span>
+                    <span class="result-value">${participationText}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Сертификат участника:</span>
+                    <span class="result-value">${certificate}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Подписка на рассылку:</span>
+                    <span class="result-value">${newsletter}</span>
+                </div>
+            `;
+            
+            resultDiv.style.display = 'block';
+            
+            // Прокрутка к результату
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+            
             // В реальном приложении здесь будет отправка данных на сервер
             console.log('Данные формы:', data);
-            
-            // Показать сообщение об успешной регистрации
-            alert('Спасибо за регистрацию на конференцию! Мы отправили подтверждение на вашу электронную почту.');
-            
-            // Очистка формы
-            this.reset();
         });
+        
+        // Функция для получения текста формы участия
+        function getParticipationText(value) {
+            switch(value) {
+                case 'offline': return 'Очное участие';
+                case 'online': return 'Онлайн-участие';
+                case 'poster': return 'Стендовый доклад';
+                default: return 'Не указано';
+            }
+        }
     </script>
 </body>
 </html>
