@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация на конференцию</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #2575fc;
+            color: white;
+            padding: 25px 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 16px;
+        }
+        
+        .form-container {
+            padding: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 22px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #444;
+        }
+        
+        input[type="text"],
+        input[type="email"],
+        select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        select:focus {
+            border-color: #2575fc;
+            box-shadow: 0 0 0 3px rgba(37, 117, 252, 0.2);
+            outline: none;
+        }
+        
+        .checkbox-group, .radio-group {
+            margin: 15px 0;
+        }
+        
+        .checkbox-group label, .radio-group label {
+            display: flex;
+            align-items: center;
+            font-weight: normal;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        
+        input[type="checkbox"], input[type="radio"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+        }
+        
+        .radio-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .radio-option {
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        .required {
+            color: #e74c3c;
+        }
+        
+        .submit-btn {
+            background: #2575fc;
+            color: white;
+            border: none;
+            padding: 14px 25px;
+            font-size: 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.3s;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+        
+        .submit-btn:hover {
+            background: #1a68e8;
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .form-col {
+            flex: 1;
+        }
+        
+        .info-text {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        @media (max-width: 600px) {
+            .form-row {
+                flex-direction: column;
+                gap: 0;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .form-container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Регистрация на научную конференцию</h1>
+            <p>Международная конференция "Наука будущего" • 15-17 ноября 2023</p>
+        </div>
+        
+        <div class="form-container">
+            <form id="conferenceForm">
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label for="fullName">ФИО <span class="required">*</span></label>
+                            <input type="text" id="fullName" name="fullName" placeholder="Иванов Иван Иванович" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label for="email">Email <span class="required">*</span></label>
+                            <input type="email" id="email" name="email" placeholder="example@mail.ru" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label for="birthYear">Год рождения <span class="required">*</span></label>
+                            <select id="birthYear" name="birthYear" required>
+                                <option value="">Выберите год</option>
+                                <!-- Годы с 1950 по 2005 -->
+                                <script>
+                                    for (let year = 1950; year <= 2005; year++) {
+                                        document.write(`<option value="${year}">${year}</option>`);
+                                    }
+                                </script>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-col">
+                        <div class="form-group">
+                            <label for="section">Секция <span class="required">*</span></label>
+                            <select id="section" name="section" required>
+                                <option value="">Выберите секцию</option>
+                                <option value="physics">Физика и астрономия</option>
+                                <option value="chemistry">Химия и науки о материалах</option>
+                                <option value="biology">Биология и науки о жизни</option>
+                                <option value="math">Математика и информатика</option>
+                                <option value="engineering">Инженерия и технологии</option>
+                                <option value="medicine">Медицина и здравоохранение</option>
+                                <option value="social">Социальные науки</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Форма участия <span class="required">*</span></label>
+                    <div class="radio-group">
+                        <div class="radio-options">
+                            <div class="radio-option">
+                                <label>
+                                    <input type="radio" name="participation" value="offline" required>
+                                    Очное участие
+                                </label>
+                            </div>
+                            <div class="radio-option">
+                                <label>
+                                    <input type="radio" name="participation" value="online">
+                                    Онлайн-участие
+                                </label>
+                            </div>
+                            <div class="radio-option">
+                                <label>
+                                    <input type="radio" name="participation" value="poster">
+                                    Стендовый доклад
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" name="certificate" value="yes">
+                        Нужен сертификат участника
+                    </label>
+                    <p class="info-text">Сертификат будет выдан после завершения конференции</p>
+                </div>
+                
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" name="newsletter" value="yes">
+                        Подписаться на рассылку о будущих мероприятиях
+                    </label>
+                </div>
+                
+                <button type="submit" class="submit-btn">Зарегистрироваться на конференцию</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('conferenceForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            // Сбор данных формы
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            
+            // Проверка выбора формы участия
+            const participationSelected = document.querySelector('input[name="participation"]:checked');
+            if (!participationSelected) {
+                alert('Пожалуйста, выберите форму участия');
+                return;
+            }
+            
+            // В реальном приложении здесь будет отправка данных на сервер
+            console.log('Данные формы:', data);
+            
+            // Показать сообщение об успешной регистрации
+            alert('Спасибо за регистрацию на конференцию! Мы отправили подтверждение на вашу электронную почту.');
+            
+            // Очистка формы
+            this.reset();
+        });
+    </script>
+</body>
+</html>
