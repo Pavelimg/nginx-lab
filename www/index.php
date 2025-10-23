@@ -1,3 +1,20 @@
+<?php
+session_start();
+require_once 'ApiClient.php';
+require_once 'UserInfo.php';
+
+// Получаем информацию о пользователе
+$userInfo = UserInfo::getInfo();
+
+// Получаем данные из API (HTTP коты)
+$api = new ApiClient();
+$statusCodes = [100, 200, 201, 202, 204, 301, 302, 304, 400, 401, 403, 404, 405, 408, 409, 410, 418, 422, 429, 500, 502, 503, 504];
+$randomStatusCode = $statusCodes[array_rand($statusCodes)];
+$url = "https://http.cat/{$randomStatusCode}";
+$apiData = $api->requestImage($url);
+
+$_SESSION['api_data'] = $apiData;
+?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -127,28 +144,31 @@
             font-style: italic;
         }
         
-        .currency-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 10px;
-            margin-top: 10px;
+        .cat-image {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin: 15px 0;
+            border: 3px solid #6f42c1;
         }
         
-        .currency-item {
-            padding: 8px;
-            background: white;
-            border-radius: 4px;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .currency-code {
+        .status-code {
+            display: inline-block;
+            background: #6f42c1;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
             font-weight: bold;
-            color: #2575fc;
+            font-size: 18px;
+            margin: 10px 0;
         }
         
-        .currency-rate {
-            color: #28a745;
+        .status-description {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 3px solid #6f42c1;
         }
     </style>
 </head>
@@ -161,19 +181,6 @@
         
         <div class="content">
             <?php
-            session_start();
-            require_once 'ApiClient.php';
-            require_once 'UserInfo.php';
-            
-            // Получаем информацию о пользователе
-            $userInfo = UserInfo::getInfo();
-            
-            // Получаем данные из API (курсы валют)
-            $api = new ApiClient();
-            $url = 'https://api.exchangerate.host/latest?base=USD';
-            $apiData = $api->request($url);
-            $_SESSION['api_data'] = $apiData;
-            
             // Вывод ошибок
             if(isset($_SESSION['errors'])): ?>
                 <div class="data-section errors">
@@ -200,36 +207,36 @@
 
             <!-- Данные из API -->
             <div class="data-section api-data">
-                <h3>🌐 Данные из API (курсы валют):</h3>
-                <?php if(isset($apiData['success']) && $apiData['success'] === true): ?>
-                    <div class="data-item">
-                        <span class="data-label">Базовая валюта:</span>
-                        <span><?= htmlspecialchars($apiData['base'] ?? 'USD') ?></span>
+                <h3>🐱 HTTP Котики:</h3>
+                <?php if(isset($apiData['image_url'])): ?>
+                    <div class="status-code">
+                        HTTP Status: <?= htmlspecialchars($apiData['status_code']) ?>
                     </div>
-                    <div class="data-item">
-                        <span class="data-label">Дата:</span>
-                        <span><?= htmlspecialchars($apiData['date'] ?? '') ?></span>
+                    
+                    <div class="status-description">
+                        <strong>Описание:</strong> <?= htmlspecialchars($apiData['description']) ?>
                     </div>
-                    <h4>Курсы валют:</h4>
-                    <div class="currency-grid">
-                        <?php 
-                        $count = 0;
-                        foreach($apiData['rates'] as $currency => $rate): 
-                            if($count++ < 12): // Показываем только первые 12 валют
-                        ?>
-                            <div class="currency-item">
-                                <div class="currency-code"><?= htmlspecialchars($currency) ?></div>
-                                <div class="currency-rate"><?= number_format($rate, 4) ?></div>
-                            </div>
-                        <?php 
-                            endif;
-                        endforeach; 
-                        ?>
+                    
+                    <img src="<?= htmlspecialchars($apiData['image_url']) ?>" 
+                         alt="HTTP Cat <?= htmlspecialchars($apiData['status_code']) ?>" 
+                         class="cat-image"
+                         onerror="this.src='https://http.cat/404'">
+                    
+                    <div class="data-item">
+                        <span class="data-label">Статус:</span>
+                        <span style="color: #28a745;">✓ Изображение успешно загружено</span>
                     </div>
                 <?php elseif(isset($apiData['error'])): ?>
-                    <p class="empty-data">Ошибка получения данных: <?= htmlspecialchars($apiData['error']) ?></p>
+                    <div class="status-code">
+                        HTTP Status: 404
+                    </div>
+                    <div class="status-description">
+                        <strong>Описание:</strong> Не удалось загрузить изображение котика
+                    </div>
+                    <img src="https://http.cat/404" alt="Fallback HTTP Cat" class="cat-image">
+                    <p class="empty-data">Используется fallback изображение</p>
                 <?php else: ?>
-                    <p class="empty-data">Данные из API загружаются...</p>
+                    <p class="empty-data">Загрузка котика...</p>
                 <?php endif; ?>
             </div>
 
