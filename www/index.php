@@ -66,6 +66,16 @@
             background: #f0f9ff;
         }
         
+        .user-info {
+            border-color: #ffc107;
+            background: #fffbf0;
+        }
+        
+        .api-data {
+            border-color: #6f42c1;
+            background: #f8f9ff;
+        }
+        
         .errors {
             border-color: #dc3545;
             background: #fff5f5;
@@ -116,6 +126,30 @@
             color: #666;
             font-style: italic;
         }
+        
+        .currency-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .currency-item {
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .currency-code {
+            font-weight: bold;
+            color: #2575fc;
+        }
+        
+        .currency-rate {
+            color: #28a745;
+        }
     </style>
 </head>
 <body>
@@ -128,6 +162,17 @@
         <div class="content">
             <?php
             session_start();
+            require_once 'ApiClient.php';
+            require_once 'UserInfo.php';
+            
+            // Получаем информацию о пользователе
+            $userInfo = UserInfo::getInfo();
+            
+            // Получаем данные из API (курсы валют)
+            $api = new ApiClient();
+            $url = 'https://api.exchangerate.host/latest?base=USD';
+            $apiData = $api->request($url);
+            $_SESSION['api_data'] = $apiData;
             
             // Вывод ошибок
             if(isset($_SESSION['errors'])): ?>
@@ -141,6 +186,52 @@
                 </div>
                 <?php unset($_SESSION['errors']); ?>
             <?php endif; ?>
+
+            <!-- Информация о пользователе -->
+            <div class="data-section user-info">
+                <h3>👤 Информация о пользователе:</h3>
+                <?php foreach ($userInfo as $key => $val): ?>
+                    <div class="data-item">
+                        <span class="data-label"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $key))) ?>:</span>
+                        <span><?= htmlspecialchars($val) ?></span>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <!-- Данные из API -->
+            <div class="data-section api-data">
+                <h3>🌐 Данные из API (курсы валют):</h3>
+                <?php if(isset($apiData['success']) && $apiData['success'] === true): ?>
+                    <div class="data-item">
+                        <span class="data-label">Базовая валюта:</span>
+                        <span><?= htmlspecialchars($apiData['base'] ?? 'USD') ?></span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Дата:</span>
+                        <span><?= htmlspecialchars($apiData['date'] ?? '') ?></span>
+                    </div>
+                    <h4>Курсы валют:</h4>
+                    <div class="currency-grid">
+                        <?php 
+                        $count = 0;
+                        foreach($apiData['rates'] as $currency => $rate): 
+                            if($count++ < 12): // Показываем только первые 12 валют
+                        ?>
+                            <div class="currency-item">
+                                <div class="currency-code"><?= htmlspecialchars($currency) ?></div>
+                                <div class="currency-rate"><?= number_format($rate, 4) ?></div>
+                            </div>
+                        <?php 
+                            endif;
+                        endforeach; 
+                        ?>
+                    </div>
+                <?php elseif(isset($apiData['error'])): ?>
+                    <p class="empty-data">Ошибка получения данных: <?= htmlspecialchars($apiData['error']) ?></p>
+                <?php else: ?>
+                    <p class="empty-data">Данные из API загружаются...</p>
+                <?php endif; ?>
+            </div>
 
             <!-- Данные из сессии -->
             <div class="data-section session-data">
@@ -199,6 +290,12 @@
                         <span class="data-label">Секция:</span>
                         <span><?= htmlspecialchars($_COOKIE['section'] ?? '') ?></span>
                     </div>
+                    <?php if(isset($_COOKIE['last_submission'])): ?>
+                        <div class="data-item">
+                            <span class="data-label">Последняя отправка:</span>
+                            <span><?= htmlspecialchars($_COOKIE['last_submission']) ?></span>
+                        </div>
+                    <?php endif; ?>
                 <?php else: ?>
                     <p class="empty-data">Данных в куки пока нет.</p>
                 <?php endif; ?>
