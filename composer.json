@@ -1,0 +1,10 @@
+{
+    "name": "pavel/nginx-lab",
+    "authors": [
+        {
+            "name": "Pavel",
+            "email": "pavel.img@gmail.com"
+        }
+    ],
+    "require": {}
+}
