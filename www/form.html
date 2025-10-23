@@ -149,33 +149,22 @@
             margin-top: 5px;
         }
         
-        .result {
-            margin-top: 25px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 4px solid #2575fc;
-            display: none;
+        .nav-links {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
         }
         
-        .result h3 {
+        .nav-links a {
             color: #2575fc;
-            margin-bottom: 15px;
+            text-decoration: none;
+            margin: 0 10px;
+            font-weight: 500;
         }
         
-        .result-item {
-            margin-bottom: 10px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #eaeaea;
-        }
-        
-        .result-label {
-            font-weight: 600;
-            color: #555;
-        }
-        
-        .result-value {
-            color: #333;
+        .nav-links a:hover {
+            text-decoration: underline;
         }
         
         @media (max-width: 600px) {
@@ -202,7 +191,8 @@
         </div>
         
         <div class="form-container">
-            <form id="conferenceForm">
+            <!-- Изменяем форму для отправки в PHP -->
+            <form id="conferenceForm" action="process.php" method="POST">
                 <div class="form-row">
                     <div class="form-col">
                         <div class="form-group">
@@ -296,29 +286,25 @@
                 <button type="submit" class="submit-btn">Зарегистрироваться на конференцию</button>
             </form>
             
-            <div id="result" class="result">
-                <h3>Ваши данные для регистрации:</h3>
-                <div id="resultContent"></div>
+            <div class="nav-links">
+                <a href="index.php">На главную</a> | 
+                <a href="view.php">Посмотреть все данные</a>
             </div>
         </div>
     </div>
 
     <script>
+        // Оставляем только alert для показа данных перед отправкой
         document.getElementById('conferenceForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            // Сбор данных формы
-            const formData = new FormData(this);
-            const data = Object.fromEntries(formData);
-            
             // Проверка выбора формы участия
             const participationSelected = document.querySelector('input[name="participation"]:checked');
             if (!participationSelected) {
                 alert('Пожалуйста, выберите форму участия');
+                e.preventDefault();
                 return;
             }
             
-            // Обработка данных формы
+            // Сбор данных для alert
             const fullName = this.fullName.value;
             const email = this.email.value;
             const birthYear = this.birthYear.value;
@@ -328,51 +314,8 @@
             const certificate = this.certificate.checked ? 'Да' : 'Нет';
             const newsletter = this.newsletter.checked ? 'Да' : 'Нет';
             
-            // Вывод результата в alert
-            alert(`Спасибо за регистрацию, ${fullName}!\n\nВаши данные:\n- Email: ${email}\n- Год рождения: ${birthYear}\n- Секция: ${section}\n- Форма участия: ${participationText}\n- Сертификат: ${certificate}\n- Рассылка: ${newsletter}\n\nМы свяжемся с вами в ближайшее время!`);
-            
-            // Вывод результата на страницу
-            const resultDiv = document.getElementById('result');
-            const resultContent = document.getElementById('resultContent');
-            
-            resultContent.innerHTML = `
-                <div class="result-item">
-                    <span class="result-label">ФИО:</span>
-                    <span class="result-value">${fullName}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Email:</span>
-                    <span class="result-value">${email}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Год рождения:</span>
-                    <span class="result-value">${birthYear}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Секция:</span>
-                    <span class="result-value">${section}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Форма участия:</span>
-                    <span class="result-value">${participationText}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Сертификат участника:</span>
-                    <span class="result-value">${certificate}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Подписка на рассылку:</span>
-                    <span class="result-value">${newsletter}</span>
-                </div>
-            `;
-            
-            resultDiv.style.display = 'block';
-            
-            // Прокрутка к результату
-            resultDiv.scrollIntoView({ behavior: 'smooth' });
-            
-            // В реальном приложении здесь будет отправка данных на сервер
-            console.log('Данные формы:', data);
+            // Показываем alert с данными
+            alert(`Ваши данные перед отправкой:\n\nФИО: ${fullName}\nEmail: ${email}\nГод рождения: ${birthYear}\nСекция: ${section}\nФорма участия: ${participationText}\nСертификат: ${certificate}\nРассылка: ${newsletter}\n\nНажмите OK для отправки данных на сервер`);
         });
         
         // Функция для получения текста формы участия
