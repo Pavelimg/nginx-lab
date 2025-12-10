@@ -2,6 +2,8 @@
 session_start();
 require_once 'ApiClient.php';
 require_once 'UserInfo.php';
+require_once 'db.php';
+require_once 'Conference.php';
 
 // Получаем информацию о пользователе
 $userInfo = UserInfo::getInfo();
@@ -14,13 +16,30 @@ $url = "https://http.cat/{$randomStatusCode}";
 $apiData = $api->requestImage($url);
 
 $_SESSION['api_data'] = $apiData;
+
+// Работа с базой данных
+try {
+    $conference = new Conference($pdo);
+    
+    // Получаем данные из БД
+    $participants = $conference->getAllParticipants();
+    $totalCount = $conference->getTotalCount();
+    $certificateStats = $conference->getCertificateStats();
+    $sectionStats = $conference->getCountBySection();
+    
+    // Фильтр: участники старше 18 лет
+    $adultParticipants = $conference->getParticipantsOlderThan(18);
+    
+} catch (Exception $e) {
+    $dbError = "Ошибка базы данных: " . $e->getMessage();
+}
 ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Главная страница - Конференция</title>
+    <title>Главная страница - Конференция (БД)</title>
     <style>
         * {
             box-sizing: border-box;
@@ -37,7 +56,7 @@ $_SESSION['api_data'] = $apiData;
         }
         
         .container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
             background: white;
             border-radius: 12px;
@@ -73,6 +92,16 @@ $_SESSION['api_data'] = $apiData;
             border-left: 4px solid;
         }
         
+        .db-stats {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+        
+        .db-data {
+            border-color: #17a2b8;
+            background: #f0f9ff;
+        }
+        
         .session-data {
             border-color: #28a745;
             background: #f8fff9;
@@ -96,6 +125,15 @@ $_SESSION['api_data'] = $apiData;
         .errors {
             border-color: #dc3545;
             background: #fff5f5;
+        }
+        
+        .success {
+            border-color: #28a745;
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
         }
         
         .data-section h3 {
@@ -170,19 +208,77 @@ $_SESSION['api_data'] = $apiData;
             border-radius: 6px;
             border-left: 3px solid #6f42c1;
         }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        th, td {
+            padding: 10px 15px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        th {
+            background: #2575fc;
+            color: white;
+            font-weight: 600;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            color: #2575fc;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Лабораторная работа №3</h1>
-            <p>Научная конференция "Наука будущего"</p>
+            <h1>Лабораторная работа №5 - Работа с MySQL через PHP</h1>
+            <p>Научная конференция "Наука будущего" (данные хранятся в БД)</p>
         </div>
         
         <div class="content">
-            <?php
-            // Вывод ошибок
-            if(isset($_SESSION['errors'])): ?>
+            <?php if(isset($dbError)): ?>
+                <div class="errors">
+                    <h3>Ошибка базы данных:</h3>
+                    <p><?= htmlspecialchars($dbError) ?></p>
+                </div>
+            <?php endif; ?>
+
+            <?php if(isset($_SESSION['errors'])): ?>
                 <div class="data-section errors">
                     <h3>Ошибки при заполнении формы:</h3>
                     <ul>
@@ -192,6 +288,119 @@ $_SESSION['api_data'] = $apiData;
                     </ul>
                 </div>
                 <?php unset($_SESSION['errors']); ?>
+            <?php endif; ?>
+
+            <?php if(isset($_SESSION['success'])): ?>
+                <div class="success">
+                    <strong>✓ Успех!</strong> <?= htmlspecialchars($_SESSION['success']) ?>
+                </div>
+                <?php unset($_SESSION['success']); ?>
+            <?php endif; ?>
+
+            <!-- Статистика из БД -->
+            <?php if(isset($conference)): ?>
+                <div class="data-section db-stats">
+                    <h3>📊 Статистика конференции (из БД MySQL):</h3>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-number"><?= $totalCount ?></div>
+                            <div class="stat-label">Всего участников</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-number"><?= $certificateStats['with_certificate'] ?? 0 ?></div>
+                            <div class="stat-label">Нужен сертификат</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-number"><?= count($adultParticipants) ?></div>
+                            <div class="stat-label">Участников старше 18 лет</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-number"><?= count($sectionStats) ?></div>
+                            <div class="stat-label">Количество секций</div>
+                        </div>
+                    </div>
+                    
+                    <h4>Распределение по секциям:</h4>
+                    <table>
+                        <tr>
+                            <th>Секция</th>
+                            <th>Количество участников</th>
+                        </tr>
+                        <?php foreach($sectionStats as $section): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($section['section']) ?></td>
+                                <td><?= htmlspecialchars($section['count']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </table>
+                </div>
+
+                <!-- Данные из БД -->
+                <div class="data-section db-data">
+                    <h3>📋 Участники конференции (из БД, отсортировано по дате):</h3>
+                    
+                    <?php if(!empty($participants)): ?>
+                        <table>
+                            <tr>
+                                <th>ID</th>
+                                <th>ФИО</th>
+                                <th>Email</th>
+                                <th>Год рождения</th>
+                                <th>Секция</th>
+                                <th>Форма участия</th>
+                                <th>Сертификат</th>
+                                <th>Дата регистрации</th>
+                            </tr>
+                            <?php foreach($participants as $participant): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($participant['id']) ?></td>
+                                    <td><?= htmlspecialchars($participant['full_name']) ?></td>
+                                    <td><?= htmlspecialchars($participant['email']) ?></td>
+                                    <td><?= htmlspecialchars($participant['birth_year']) ?></td>
+                                    <td><?= htmlspecialchars($participant['section']) ?></td>
+                                    <td><?= htmlspecialchars($participant['participation_type']) ?></td>
+                                    <td><?= $participant['needs_certificate'] ? 'Да' : 'Нет' ?></td>
+                                    <td><?= htmlspecialchars($participant['created_at']) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </table>
+                    <?php else: ?>
+                        <p class="empty-data">В базе данных пока нет участников.</p>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Участники старше 18 лет -->
+                <div class="data-section db-data">
+                    <h3>👨‍🎓 Участники старше 18 лет (фильтр из БД):</h3>
+                    
+                    <?php if(!empty($adultParticipants)): ?>
+                        <table>
+                            <tr>
+                                <th>ФИО</th>
+                                <th>Возраст</th>
+                                <th>Секция</th>
+                                <th>Форма участия</th>
+                            </tr>
+                            <?php foreach($adultParticipants as $participant): 
+                                $age = date('Y') - $participant['birth_year'];
+                            ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($participant['full_name']) ?></td>
+                                    <td><?= $age ?> лет</td>
+                                    <td><?= htmlspecialchars($participant['section']) ?></td>
+                                    <td><?= htmlspecialchars($participant['participation_type']) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </table>
+                        <p><em>Всего: <?= count($adultParticipants) ?> участников старше 18 лет</em></p>
+                    <?php else: ?>
+                        <p class="empty-data">Нет участников старше 18 лет.</p>
+                    <?php endif; ?>
+                </div>
             <?php endif; ?>
 
             <!-- Информация о пользователе -->
@@ -221,20 +430,6 @@ $_SESSION['api_data'] = $apiData;
                          alt="HTTP Cat <?= htmlspecialchars($apiData['status_code']) ?>" 
                          class="cat-image"
                          onerror="this.src='https://http.cat/404'">
-                    
-                    <div class="data-item">
-                        <span class="data-label">Статус:</span>
-                        <span style="color: #28a745;">✓ Изображение успешно загружено</span>
-                    </div>
-                <?php elseif(isset($apiData['error'])): ?>
-                    <div class="status-code">
-                        HTTP Status: 404
-                    </div>
-                    <div class="status-description">
-                        <strong>Описание:</strong> Не удалось загрузить изображение котика
-                    </div>
-                    <img src="https://http.cat/404" alt="Fallback HTTP Cat" class="cat-image">
-                    <p class="empty-data">Используется fallback изображение</p>
                 <?php else: ?>
                     <p class="empty-data">Загрузка котика...</p>
                 <?php endif; ?>
@@ -242,7 +437,7 @@ $_SESSION['api_data'] = $apiData;
 
             <!-- Данные из сессии -->
             <div class="data-section session-data">
-                <h3>📋 Данные из сессии:</h3>
+                <h3>📋 Последняя регистрация (из сессии):</h3>
                 <?php if(isset($_SESSION['fullName'])): ?>
                     <div class="data-item">
                         <span class="data-label">ФИО:</span>
@@ -277,41 +472,15 @@ $_SESSION['api_data'] = $apiData;
                 <?php endif; ?>
             </div>
 
-            <!-- Данные из куки -->
-            <div class="data-section cookie-data">
-                <h3>🍪 Данные из куки:</h3>
-                <?php if(isset($_COOKIE['fullName'])): ?>
-                    <div class="data-item">
-                        <span class="data-label">ФИО:</span>
-                        <span><?= htmlspecialchars($_COOKIE['fullName']) ?></span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Email:</span>
-                        <span><?= htmlspecialchars($_COOKIE['email'] ?? '') ?></span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Год рождения:</span>
-                        <span><?= htmlspecialchars($_COOKIE['birthYear'] ?? '') ?></span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Секция:</span>
-                        <span><?= htmlspecialchars($_COOKIE['section'] ?? '') ?></span>
-                    </div>
-                    <?php if(isset($_COOKIE['last_submission'])): ?>
-                        <div class="data-item">
-                            <span class="data-label">Последняя отправка:</span>
-                            <span><?= htmlspecialchars($_COOKIE['last_submission']) ?></span>
-                        </div>
-                    <?php endif; ?>
-                <?php else: ?>
-                    <p class="empty-data">Данных в куки пока нет.</p>
-                <?php endif; ?>
-            </div>
-
             <div class="nav-links">
                 <a href="form.html" class="nav-btn">📝 Заполнить форму</a>
-                <a href="view.php" class="nav-btn">👁️ Посмотреть все данные</a>
+                <a href="view.php" class="nav-btn">👁️ Посмотреть все данные (файл)</a>
                 <a href="clear.php" class="nav-btn">🗑️ Очистить данные</a>
+                <a href="http://localhost:8081" class="nav-btn" target="_blank">📊 Adminer (управление БД)</a>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px; color: #666; font-size: 14px;">
+                <p>MySQL порт: 3307 | Adminer порт: 8081 | База данных: lab5_db</p>
             </div>
         </div>
     </div>
