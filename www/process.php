@@ -1,5 +1,10 @@
 <?php
 session_start();
+require_once 'db.php';
+require_once 'Conference.php';
+
+// Создаём объект для работы с конференцией
+$conference = new Conference($pdo);
 
 // Получаем данные из формы
 $fullName = trim($_POST['fullName'] ?? '');
@@ -7,8 +12,8 @@ $email = trim($_POST['email'] ?? '');
 $birthYear = trim($_POST['birthYear'] ?? '');
 $section = trim($_POST['section'] ?? '');
 $participation = trim($_POST['participation'] ?? '');
-$certificate = isset($_POST['certificate']) ? 'Да' : 'Нет';
-$newsletter = isset($_POST['newsletter']) ? 'Да' : 'Нет';
+$certificate = isset($_POST['certificate']) ? 1 : 0;
+$newsletter = isset($_POST['newsletter']) ? 1 : 0;
 
 // Валидация
 $errors = [];
@@ -25,6 +30,8 @@ if (empty($email)) {
 
 if (empty($birthYear)) {
     $errors[] = "Год рождения не может быть пустым";
+} elseif ($birthYear < 1950 || $birthYear > 2005) {
+    $errors[] = "Некорректный год рождения";
 }
 
 if (empty($section)) {
@@ -45,22 +52,44 @@ if (!empty($errors)) {
 // Обработка данных (экранирование)
 $fullName = htmlspecialchars($fullName);
 $email = htmlspecialchars($email);
-$birthYear = htmlspecialchars($birthYear);
+$birthYear = (int)$birthYear;
 $section = htmlspecialchars($section);
 $participation = htmlspecialchars($participation);
 
-// Получаем текстовое представление секции
+// Получаем текстовое представление секции и формы участия
 $sectionText = getSectionText($section);
 $participationText = getParticipationText($participation);
 
-// Сохраняем в сессию
+// Сохраняем в БД
+try {
+    $success = $conference->addParticipant(
+        $fullName, 
+        $email, 
+        $birthYear, 
+        $sectionText, 
+        $participationText, 
+        $certificate, 
+        $newsletter
+    );
+    
+    if ($success) {
+        $_SESSION['success'] = "Регистрация успешно завершена! Данные сохранены в базе данных.";
+    } else {
+        $_SESSION['errors'] = ["Ошибка при сохранении в базу данных"];
+    }
+    
+} catch (Exception $e) {
+    $_SESSION['errors'] = ["Ошибка базы данных: " . $e->getMessage()];
+}
+
+// Сохраняем также в сессию для обратной совместимости
 $_SESSION['fullName'] = $fullName;
 $_SESSION['email'] = $email;
 $_SESSION['birthYear'] = $birthYear;
 $_SESSION['section'] = $sectionText;
 $_SESSION['participation'] = $participationText;
-$_SESSION['certificate'] = $certificate;
-$_SESSION['newsletter'] = $newsletter;
+$_SESSION['certificate'] = $certificate ? 'Да' : 'Нет';
+$_SESSION['newsletter'] = $newsletter ? 'Да' : 'Нет';
 
 // Сохраняем в куки (на 1 час)
 setcookie('fullName', $fullName, time() + 3600, '/');
@@ -68,9 +97,10 @@ setcookie('email', $email, time() + 3600, '/');
 setcookie('birthYear', $birthYear, time() + 3600, '/');
 setcookie('section', $sectionText, time() + 3600, '/');
 
-// Сохраняем в файл
+// Также сохраняем в файл для обратной совместимости
 $timestamp = date('Y-m-d H:i:s');
-$line = $fullName . ";" . $email . ";" . $birthYear . ";" . $sectionText . ";" . $participationText . ";" . $certificate . ";" . $newsletter . ";" . $timestamp . "\n";
+$line = $fullName . ";" . $email . ";" . $birthYear . ";" . $sectionText . ";" . $participationText . ";" . 
+        ($certificate ? 'Да' : 'Нет') . ";" . ($newsletter ? 'Да' : 'Нет') . ";" . $timestamp . "\n";
 file_put_contents("data.txt", $line, FILE_APPEND);
 
 // Перенаправляем на главную
