@@ -1,45 +1,17 @@
 <?php
-session_start();
-require_once 'ApiClient.php';
-require_once 'UserInfo.php';
-require_once 'db.php';
-require_once 'Conference.php';
+require_once 'vendor/autoload.php';
 
-// Получаем информацию о пользователе
-$userInfo = UserInfo::getInfo();
+use App\Services\RedisService;
+use App\Services\ElasticsearchService;
+use App\Services\ClickHouseService;
 
-// Получаем данные из API (HTTP коты)
-$api = new ApiClient();
-$statusCodes = [100, 200, 201, 202, 204, 301, 302, 304, 400, 401, 403, 404, 405, 408, 409, 410, 418, 422, 429, 500, 502, 503, 504];
-$randomStatusCode = $statusCodes[array_rand($statusCodes)];
-$url = "https://http.cat/{$randomStatusCode}";
-$apiData = $api->requestImage($url);
-
-$_SESSION['api_data'] = $apiData;
-
-// Работа с базой данных
-try {
-    $conference = new Conference($pdo);
-    
-    // Получаем данные из БД
-    $participants = $conference->getAllParticipants();
-    $totalCount = $conference->getTotalCount();
-    $certificateStats = $conference->getCertificateStats();
-    $sectionStats = $conference->getCountBySection();
-    
-    // Фильтр: участники старше 18 лет
-    $adultParticipants = $conference->getParticipantsOlderThan(18);
-    
-} catch (Exception $e) {
-    $dbError = "Ошибка базы данных: " . $e->getMessage();
-}
 ?>
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Главная страница - Конференция (БД)</title>
+    <title>Лабораторная работа №6 - Нереляционные БД</title>
     <style>
         * {
             box-sizing: border-box;
@@ -49,14 +21,14 @@ try {
         }
         
         body {
-            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #333;
             min-height: 100vh;
             padding: 20px;
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             background: white;
             border-radius: 12px;
@@ -65,7 +37,7 @@ try {
         }
         
         .header {
-            background: #2575fc;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 30px;
             text-align: center;
@@ -83,75 +55,149 @@ try {
         
         .content {
             padding: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
         }
         
-        .data-section {
-            margin: 25px 0;
-            padding: 20px;
+        .section {
+            background: #f8f9fa;
+            padding: 25px;
             border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             border-left: 4px solid;
         }
         
-        .db-stats {
-            border-color: #28a745;
-            background: #f8fff9;
-        }
-        
-        .db-data {
-            border-color: #17a2b8;
-            background: #f0f9ff;
-        }
-        
-        .session-data {
-            border-color: #28a745;
-            background: #f8fff9;
-        }
-        
-        .cookie-data {
-            border-color: #17a2b8;
-            background: #f0f9ff;
-        }
-        
-        .user-info {
-            border-color: #ffc107;
-            background: #fffbf0;
-        }
-        
-        .api-data {
-            border-color: #6f42c1;
-            background: #f8f9ff;
-        }
-        
-        .errors {
+        .redis-section {
             border-color: #dc3545;
-            background: #fff5f5;
         }
         
-        .success {
+        .elastic-section {
             border-color: #28a745;
-            background: #d4edda;
-            color: #155724;
+        }
+        
+        .clickhouse-section {
+            border-color: #17a2b8;
+        }
+        
+        .section h2 {
+            margin-bottom: 20px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section h2 i {
+            font-size: 24px;
+        }
+        
+        .result {
+            background: white;
             padding: 15px;
             border-radius: 6px;
             margin: 15px 0;
+            border: 1px solid #dee2e6;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
         }
         
-        .data-section h3 {
-            margin-bottom: 15px;
-            color: #333;
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
         
-        .data-item {
-            margin-bottom: 10px;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         
-        .data-label {
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
             font-weight: 600;
-            color: #555;
-            display: inline-block;
-            width: 200px;
+            transition: all 0.3s;
+        }
+        
+        .btn-redis {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-elastic {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-clickhouse {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+        
+        .form-group {
+            margin: 10px 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .form-row input {
+            flex: 1;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
         }
         
         .nav-links {
@@ -163,7 +209,7 @@ try {
         
         .nav-btn {
             display: inline-block;
-            background: #2575fc;
+            background: #667eea;
             color: white;
             padding: 12px 25px;
             text-decoration: none;
@@ -174,315 +220,344 @@ try {
         }
         
         .nav-btn:hover {
-            background: #1a68e8;
+            background: #5a67d8;
+            text-decoration: none;
         }
         
-        .empty-data {
-            color: #666;
-            font-style: italic;
-        }
-        
-        .cat-image {
-            max-width: 100%;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            margin: 15px 0;
-            border: 3px solid #6f42c1;
-        }
-        
-        .status-code {
-            display: inline-block;
-            background: #6f42c1;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 18px;
-            margin: 10px 0;
-        }
-        
-        .status-description {
-            margin: 10px 0;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            border-left: 3px solid #6f42c1;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        
-        th, td {
-            padding: 10px 15px;
-            text-align: left;
-            border-bottom: 1px solid #dee2e6;
-        }
-        
-        th {
-            background: #2575fc;
-            color: white;
-            font-weight: 600;
-        }
-        
-        tr:hover {
-            background: #f8f9fa;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin: 20px 0;
-        }
-        
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        
-        .stat-number {
-            font-size: 36px;
-            font-weight: bold;
-            color: #2575fc;
-            margin: 10px 0;
-        }
-        
-        .stat-label {
-            color: #666;
-            font-size: 14px;
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
         }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Лабораторная работа №5 - Работа с MySQL через PHP</h1>
-            <p>Научная конференция "Наука будущего" (данные хранятся в БД)</p>
+            <h1><i class="fas fa-database"></i> Лабораторная работа №6</h1>
+            <p>Нереляционные базы данных: Redis, Elasticsearch, ClickHouse</p>
         </div>
         
         <div class="content">
-            <?php if(isset($dbError)): ?>
-                <div class="errors">
-                    <h3>Ошибка базы данных:</h3>
-                    <p><?= htmlspecialchars($dbError) ?></p>
-                </div>
-            <?php endif; ?>
-
-            <?php if(isset($_SESSION['errors'])): ?>
-                <div class="data-section errors">
-                    <h3>Ошибки при заполнении формы:</h3>
-                    <ul>
-                        <?php foreach($_SESSION['errors'] as $error): ?>
-                            <li><?= htmlspecialchars($error) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-                <?php unset($_SESSION['errors']); ?>
-            <?php endif; ?>
-
-            <?php if(isset($_SESSION['success'])): ?>
-                <div class="success">
-                    <strong>✓ Успех!</strong> <?= htmlspecialchars($_SESSION['success']) ?>
-                </div>
-                <?php unset($_SESSION['success']); ?>
-            <?php endif; ?>
-
-            <!-- Статистика из БД -->
-            <?php if(isset($conference)): ?>
-                <div class="data-section db-stats">
-                    <h3>📊 Статистика конференции (из БД MySQL):</h3>
+            <!-- Redis Section -->
+            <div class="section redis-section">
+                <h2><i class="fas fa-bolt" style="color: #dc3545;"></i> Redis (Кэширование)</h2>
+                
+                <?php
+                try {
+                    $redis = new RedisService();
                     
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-number"><?= $totalCount ?></div>
-                            <div class="stat-label">Всего участников</div>
-                        </div>
-                        
-                        <div class="stat-card">
-                            <div class="stat-number"><?= $certificateStats['with_certificate'] ?? 0 ?></div>
-                            <div class="stat-label">Нужен сертификат</div>
-                        </div>
-                        
-                        <div class="stat-card">
-                            <div class="stat-number"><?= count($adultParticipants) ?></div>
-                            <div class="stat-label">Участников старше 18 лет</div>
-                        </div>
-                        
-                        <div class="stat-card">
-                            <div class="stat-number"><?= count($sectionStats) ?></div>
-                            <div class="stat-label">Количество секций</div>
-                        </div>
-                    </div>
+                    echo '<div class="controls">';
+                    echo '<button class="btn btn-redis" onclick="setRedisData()">Сохранить тестовые данные</button>';
+                    echo '<button class="btn btn-redis" onclick="getRedisData()">Получить данные</button>';
+                    echo '<button class="btn btn-redis" onclick="clearRedisData()">Очистить кэш</button>';
+                    echo '</div>';
                     
-                    <h4>Распределение по секциям:</h4>
-                    <table>
-                        <tr>
-                            <th>Секция</th>
-                            <th>Количество участников</th>
-                        </tr>
-                        <?php foreach($sectionStats as $section): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($section['section']) ?></td>
-                                <td><?= htmlspecialchars($section['count']) ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </table>
-                </div>
-
-                <!-- Данные из БД -->
-                <div class="data-section db-data">
-                    <h3>📋 Участники конференции (из БД, отсортировано по дате):</h3>
+                    echo '<div class="result" id="redis-result">';
+                    echo '<p>Готов к работе...</p>';
                     
-                    <?php if(!empty($participants)): ?>
-                        <table>
-                            <tr>
-                                <th>ID</th>
-                                <th>ФИО</th>
-                                <th>Email</th>
-                                <th>Год рождения</th>
-                                <th>Секция</th>
-                                <th>Форма участия</th>
-                                <th>Сертификат</th>
-                                <th>Дата регистрации</th>
-                            </tr>
-                            <?php foreach($participants as $participant): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($participant['id']) ?></td>
-                                    <td><?= htmlspecialchars($participant['full_name']) ?></td>
-                                    <td><?= htmlspecialchars($participant['email']) ?></td>
-                                    <td><?= htmlspecialchars($participant['birth_year']) ?></td>
-                                    <td><?= htmlspecialchars($participant['section']) ?></td>
-                                    <td><?= htmlspecialchars($participant['participation_type']) ?></td>
-                                    <td><?= $participant['needs_certificate'] ? 'Да' : 'Нет' ?></td>
-                                    <td><?= htmlspecialchars($participant['created_at']) ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </table>
-                    <?php else: ?>
-                        <p class="empty-data">В базе данных пока нет участников.</p>
-                    <?php endif; ?>
-                </div>
-
-                <!-- Участники старше 18 лет -->
-                <div class="data-section db-data">
-                    <h3>👨‍🎓 Участники старше 18 лет (фильтр из БД):</h3>
+                    // Примеры данных для Redis
+                    $testData = [
+                        'product:popular' => ['Ноутбук Dell', 'Смартфон iPhone', 'Наушники Sony'],
+                        'stats:total_products' => 156,
+                        'cache:categories' => ['Электроника', 'Одежда', 'Книги', 'Мебель'],
+                        'last_update' => date('Y-m-d H:i:s')
+                    ];
                     
-                    <?php if(!empty($adultParticipants)): ?>
-                        <table>
-                            <tr>
-                                <th>ФИО</th>
-                                <th>Возраст</th>
-                                <th>Секция</th>
-                                <th>Форма участия</th>
-                            </tr>
-                            <?php foreach($adultParticipants as $participant): 
-                                $age = date('Y') - $participant['birth_year'];
-                            ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($participant['full_name']) ?></td>
-                                    <td><?= $age ?> лет</td>
-                                    <td><?= htmlspecialchars($participant['section']) ?></td>
-                                    <td><?= htmlspecialchars($participant['participation_type']) ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </table>
-                        <p><em>Всего: <?= count($adultParticipants) ?> участников старше 18 лет</em></p>
-                    <?php else: ?>
-                        <p class="empty-data">Нет участников старше 18 лет.</p>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
-
-            <!-- Информация о пользователе -->
-            <div class="data-section user-info">
-                <h3>👤 Информация о пользователе:</h3>
-                <?php foreach ($userInfo as $key => $val): ?>
-                    <div class="data-item">
-                        <span class="data-label"><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $key))) ?>:</span>
-                        <span><?= htmlspecialchars($val) ?></span>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-
-            <!-- Данные из API -->
-            <div class="data-section api-data">
-                <h3>🐱 HTTP Котики:</h3>
-                <?php if(isset($apiData['image_url'])): ?>
-                    <div class="status-code">
-                        HTTP Status: <?= htmlspecialchars($apiData['status_code']) ?>
-                    </div>
+                    echo '</div>';
                     
-                    <div class="status-description">
-                        <strong>Описание:</strong> <?= htmlspecialchars($apiData['description']) ?>
-                    </div>
-                    
-                    <img src="<?= htmlspecialchars($apiData['image_url']) ?>" 
-                         alt="HTTP Cat <?= htmlspecialchars($apiData['status_code']) ?>" 
-                         class="cat-image"
-                         onerror="this.src='https://http.cat/404'">
-                <?php else: ?>
-                    <p class="empty-data">Загрузка котика...</p>
-                <?php endif; ?>
-            </div>
-
-            <!-- Данные из сессии -->
-            <div class="data-section session-data">
-                <h3>📋 Последняя регистрация (из сессии):</h3>
-                <?php if(isset($_SESSION['fullName'])): ?>
-                    <div class="data-item">
-                        <span class="data-label">ФИО:</span>
-                        <span><?= htmlspecialchars($_SESSION['fullName']) ?></span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Email:</span>
-                        <span><?= htmlspecialchars($_SESSION['email'] ?? '') ?></span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Год рождения:</span>
-                        <span><?= htmlspecialchars($_SESSION['birthYear'] ?? '') ?></span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Секция:</span>
-                        <span><?= htmlspecialchars($_SESSION['section'] ?? '') ?></span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Форма участия:</span>
-                        <span><?= htmlspecialchars($_SESSION['participation'] ?? '') ?></span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Сертификат:</span>
-                        <span><?= htmlspecialchars($_SESSION['certificate'] ?? 'Нет') ?></span>
-                    </div>
-                    <div class="data-item">
-                        <span class="data-label">Рассылка:</span>
-                        <span><?= htmlspecialchars($_SESSION['newsletter'] ?? 'Нет') ?></span>
-                    </div>
-                <?php else: ?>
-                    <p class="empty-data">Данных в сессии пока нет.</p>
-                <?php endif; ?>
-            </div>
-
-            <div class="nav-links">
-                <a href="form.html" class="nav-btn">📝 Заполнить форму</a>
-                <a href="view.php" class="nav-btn">👁️ Посмотреть все данные (файл)</a>
-                <a href="clear.php" class="nav-btn">🗑️ Очистить данные</a>
-                <a href="http://localhost:8081" class="nav-btn" target="_blank">📊 Adminer (управление БД)</a>
+                } catch (Exception $e) {
+                    echo '<div class="result" style="color: #dc3545;">';
+                    echo 'Ошибка Redis: ' . htmlspecialchars($e->getMessage());
+                    echo '</div>';
+                }
+                ?>
             </div>
             
-            <div style="text-align: center; margin-top: 20px; color: #666; font-size: 14px;">
-                <p>MySQL порт: 3307 | Adminer порт: 8081 | База данных: lab5_db</p>
+            <!-- Elasticsearch Section -->
+            <div class="section elastic-section">
+                <h2><i class="fas fa-search" style="color: #28a745;"></i> Elasticsearch (Товары)</h2>
+                
+                <?php
+                try {
+                    $elastic = new ElasticsearchService();
+                    
+                    echo '<div class="controls">';
+                    echo '<button class="btn btn-elastic" onclick="initElasticsearch()">Инициализировать индекс</button>';
+                    echo '<button class="btn btn-elastic" onclick="addSampleProducts()">Добавить тестовые товары</button>';
+                    echo '<button class="btn btn-elastic" onclick="searchProducts()">Поиск товаров</button>';
+                    echo '<button class="btn btn-elastic" onclick="getElasticStats()">Статистика</button>';
+                    echo '</div>';
+                    
+                    echo '<div class="result" id="elastic-result">';
+                    echo '<p>Elasticsearch готов к работе...</p>';
+                    
+                    // Проверка соединения
+                    if ($elastic->indexExists()) {
+                        echo '<p style="color: #28a745;">✓ Индекс products существует</p>';
+                    } else {
+                        echo '<p style="color: #ffc107;">⚠ Индекс products не найден</p>';
+                    }
+                    
+                    echo '</div>';
+                    
+                    echo '<div class="form-group">';
+                    echo '<label for="search-query">Поиск товаров:</label>';
+                    echo '<input type="text" id="search-query" placeholder="Введите название или описание...">';
+                    echo '</div>';
+                    
+                    echo '<div class="form-row">';
+                    echo '<select id="category-filter">';
+                    echo '<option value="">Все категории</option>';
+                    echo '<option value="Электроника">Электроника</option>';
+                    echo '<option value="Одежда">Одежда</option>';
+                    echo '<option value="Книги">Книги</option>';
+                    echo '<option value="Мебель">Мебель</option>';
+                    echo '<option value="Игрушки">Игрушки</option>';
+                    echo '</select>';
+                    
+                    echo '<input type="number" id="min-price" placeholder="Мин. цена">';
+                    echo '<input type="number" id="max-price" placeholder="Макс. цена">';
+                    echo '</div>';
+                    
+                    // Тестовые товары
+                    $sampleProducts = [
+                        [
+                            'id' => 1,
+                            'name' => 'Ноутбук Dell XPS 13',
+                            'category' => 'Электроника',
+                            'price' => 89999.99,
+                            'quantity' => 15,
+                            'description' => 'Мощный ультрабук с процессором Intel Core i7',
+                            'tags' => ['ноутбук', 'ультрабук', 'dell'],
+                            'is_active' => true
+                        ],
+                        [
+                            'id' => 2,
+                            'name' => 'Смартфон iPhone 15 Pro',
+                            'category' => 'Электроника',
+                            'price' => 119999.99,
+                            'quantity' => 8,
+                            'description' => 'Флагманский смартфон Apple с камерой 48 МП',
+                            'tags' => ['смартфон', 'iphone', 'apple'],
+                            'is_active' => true
+                        ],
+                        [
+                            'id' => 3,
+                            'name' => 'Наушники Sony WH-1000XM5',
+                            'category' => 'Электроника',
+                            'price' => 29999.99,
+                            'quantity' => 25,
+                            'description' => 'Беспроводные наушники с шумоподавлением',
+                            'tags' => ['наушники', 'sony', 'беспроводные'],
+                            'is_active' => true
+                        ],
+                        [
+                            'id' => 4,
+                            'name' => 'Футболка хлопковая',
+                            'category' => 'Одежда',
+                            'price' => 1499.99,
+                            'quantity' => 100,
+                            'description' => 'Мужская футболка из 100% хлопка',
+                            'tags' => ['футболка', 'одежда', 'хлопок'],
+                            'is_active' => true
+                        ],
+                        [
+                            'id' => 5,
+                            'name' => 'Книга "Искусство программирования"',
+                            'category' => 'Книги',
+                            'price' => 3999.99,
+                            'quantity' => 12,
+                            'description' => 'Классический труд Дональда Кнута',
+                            'tags' => ['книга', 'программирование', 'knuth'],
+                            'is_active' => true
+                        ]
+                    ];
+                    
+                } catch (Exception $e) {
+                    echo '<div class="result" style="color: #dc3545;">';
+                    echo 'Ошибка Elasticsearch: ' . htmlspecialchars($e->getMessage());
+                    echo '</div>';
+                }
+                ?>
+            </div>
+            
+            <!-- ClickHouse Section -->
+            <div class="section clickhouse-section">
+                <h2><i class="fas fa-chart-line" style="color: #17a2b8;"></i> ClickHouse (Аналитика)</h2>
+                
+                <?php
+                try {
+                    $clickhouse = new ClickHouseService();
+                    
+                    echo '<div class="controls">';
+                    echo '<button class="btn btn-clickhouse" onclick="initClickHouse()">Создать таблицу</button>';
+                    echo '<button class="btn btn-clickhouse" onclick="addAnalytics()">Добавить аналитику</button>';
+                    echo '<button class="btn btn-clickhouse" onclick="getAnalytics()">Получить статистику</button>';
+                    echo '</div>';
+                    
+                    echo '<div class="result" id="clickhouse-result">';
+                    echo '<p>ClickHouse готов к работе...</p>';
+                    
+                    // Примеры аналитических данных
+                    $analyticsData = [
+                        [
+                            'product_id' => 1,
+                            'action' => 'view',
+                            'price' => 89999.99,
+                            'quantity' => 1,
+                            'category' => 'Электроника'
+                        ],
+                        [
+                            'product_id' => 2,
+                            'action' => 'purchase',
+                            'price' => 119999.99,
+                            'quantity' => 1,
+                            'category' => 'Электроника'
+                        ],
+                        [
+                            'product_id' => 3,
+                            'action' => 'view',
+                            'price' => 29999.99,
+                            'quantity' => 1,
+                            'category' => 'Электроника'
+                        ]
+                    ];
+                    
+                    echo '</div>';
+                    
+                } catch (Exception $e) {
+                    echo '<div class="result" style="color: #dc3545;">';
+                    echo 'Ошибка ClickHouse: ' . htmlspecialchars($e->getMessage());
+                    echo '</div>';
+                }
+                ?>
             </div>
         </div>
+        
+        <div class="nav-links">
+            <a href="form.php" class="nav-btn">📝 Форма добавления товара</a>
+            <a href="stats.php" class="nav-btn">📊 Детальная статистика</a>
+        </div>
     </div>
+    
+    <script>
+        // Redis функции
+        async function setRedisData() {
+            const resultDiv = document.getElementById('redis-result');
+            resultDiv.innerHTML = '<p>Сохранение данных в Redis...</p>';
+            
+            const response = await fetch('api/redis/set.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            
+            const data = await response.json();
+            resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+        
+        async function getRedisData() {
+            const resultDiv = document.getElementById('redis-result');
+            resultDiv.innerHTML = '<p>Получение данных из Redis...</p>';
+            
+            const response = await fetch('api/redis/get.php');
+            const data = await response.json();
+            resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+        
+        async function clearRedisData() {
+            const resultDiv = document.getElementById('redis-result');
+            resultDiv.innerHTML = '<p>Очистка кэша Redis...</p>';
+            
+            const response = await fetch('api/redis/clear.php');
+            const data = await response.json();
+            resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+        
+        // Elasticsearch функции
+        async function initElasticsearch() {
+            const resultDiv = document.getElementById('elastic-result');
+            resultDiv.innerHTML = '<p>Создание индекса в Elasticsearch...</p>';
+            
+            const response = await fetch('api/elastic/init.php');
+            const data = await response.json();
+            resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+        
+        async function addSampleProducts() {
+            const resultDiv = document.getElementById('elastic-result');
+            resultDiv.innerHTML = '<p>Добавление тестовых товаров...</p>';
+            
+            const response = await fetch('api/elastic/add-products.php');
+            const data = await response.json();
+            resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+        
+        async function searchProducts() {
+            const query = document.getElementById('search-query').value;
+            const category = document.getElementById('category-filter').value;
+            const minPrice = document.getElementById('min-price').value;
+            const maxPrice = document.getElementById('max-price').value;
+            
+            const resultDiv = document.getElementById('elastic-result');
+            resultDiv.innerHTML = '<p>Поиск товаров...</p>';
+            
+            const params = new URLSearchParams();
+            if (query) params.append('query', query);
+            if (category) params.append('category', category);
+            if (minPrice) params.append('min_price', minPrice);
+            if (maxPrice) params.append('max_price', maxPrice);
+            
+            const response = await fetch('api/elastic/search.php?' + params.toString());
+            const data = await response.json();
+            resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+        
+        async function getElasticStats() {
+            const resultDiv = document.getElementById('elastic-result');
+            resultDiv.innerHTML = '<p>Получение статистики...</p>';
+            
+            const response = await fetch('api/elastic/stats.php');
+            const data = await response.json();
+            resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+        
+        // ClickHouse функции
+        async function initClickHouse() {
+            const resultDiv = document.getElementById('clickhouse-result');
+            resultDiv.innerHTML = '<p>Создание таблицы в ClickHouse...</p>';
+            
+            const response = await fetch('api/clickhouse/init.php');
+            const data = await response.json();
+            resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+        
+        async function addAnalytics() {
+            const resultDiv = document.getElementById('clickhouse-result');
+            resultDiv.innerHTML = '<p>Добавление аналитических данных...</p>';
+            
+            const response = await fetch('api/clickhouse/add-analytics.php');
+            const data = await response.json();
+            resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+        
+        async function getAnalytics() {
+            const resultDiv = document.getElementById('clickhouse-result');
+            resultDiv.innerHTML = '<p>Получение аналитики...</p>';
+            
+            const response = await fetch('api/clickhouse/stats.php');
+            const data = await response.json();
+            resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+        }
+    </script>
 </body>
 </html>
