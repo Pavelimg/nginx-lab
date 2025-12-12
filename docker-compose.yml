@@ -50,15 +50,18 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
 
   zookeeper:
-    image: bitnami/zookeeper:latest
+    image: zookeeper:latest
     container_name: lab7_zookeeper
-    environment:
-      - ALLOW_ANONYMOUS_LOGIN=yes
-      - ZOO_ENABLE_AUTH=no
     ports:
       - "2181:2181"
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+      ZOO_STANDALONE_ENABLED: "false"
+      ZOO_MY_ID: 1
+      ZOO_SERVERS: "server.1=zookeeper:2888:3888;2181"
     volumes:
-      - zookeeper_data:/bitnami/zookeeper
+      - zookeeper_data:/data
+      - zookeeper_datalog:/datalog
 
   kafka:
     image: apache/kafka:latest
@@ -101,4 +104,5 @@ volumes:
   mysql_data:
   rabbitmq_data:
   zookeeper_data:
+  zookeeper_datalog:
   kafka_data:

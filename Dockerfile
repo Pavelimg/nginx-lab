@@ -19,13 +19,13 @@ RUN apt-get update && apt-get install -y \
     pcntl
 
 # Устанавливаем Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer 
 
 WORKDIR /var/www/html
 
 # Копируем зависимости и устанавливаем их
 COPY ./www/composer.json /var/www/html/
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --no-dev --optimize-autoloader --ignore-platform-reqs
 
 # Копируем приложение
 COPY ./www /var/www/html
