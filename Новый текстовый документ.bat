@@ -1,23 +1,30 @@
-# Создаём исправленный конфиг локально
-(
-echo server {
-echo     listen 80;
-echo     server_name localhost;
-echo     root /usr/share/nginx/html;
-echo     index index.php index.html;
+@echo off
+echo ===== ДИАГНОСТИКА NGINX =====
 echo.
-echo     location / {
-echo         try_files $uri $uri/ /index.php?$query_string;
-echo     }
-echo.
-echo     location ~ \.php$ {
-echo         fastcgi_pass php:9000;
-echo         fastcgi_index index.php;
-echo         fastcgi_param SCRIPT_FILENAME /var/www/html$fastcgi_script_name;
-echo         include fastcgi_params;
-echo     }
-echo }
-) > nginx_correct.conf
 
-# Копируем в контейнер
-docker cp nginx_correct.conf lab7_nginx:/etc/nginx/conf.d/default.conf
+echo 1. Статус контейнера:
+docker-compose ps nginx
+
+echo.
+echo 2. Процессы внутри контейнера:
+docker exec lab7_nginx ps aux | findstr nginx
+
+echo.
+echo 3. Порт 80 внутри контейнера:
+docker exec lab7_nginx netstat -tln 2>nul | findstr :80
+
+echo.
+echo 4. Конфигурация:
+docker exec lab7_nginx cat /etc/nginx/conf.d/default.conf | findstr "SCRIPT_FILENAME"
+
+echo.
+echo 5. Логи (последние 5 строк):
+docker-compose logs nginx --tail 5
+
+echo.
+echo ===== ТЕСТ =====
+echo Откройте в браузере:
+echo 1. http://localhost:8070/nginx_test.html
+echo 2. http://localhost:8070/path_check.php
+echo.
+pause
