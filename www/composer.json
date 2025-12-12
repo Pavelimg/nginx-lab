@@ -1,12 +1,12 @@
 {
-    "name": "lab6/products-app",
-    "description": "Лабораторная работа №6 - Нереляционные БД",
+    "name": "lab7/queues-app",
+    "description": "Лабораторная работа №7 - Очереди сообщений",
     "type": "project",
     "require": {
-        "guzzlehttp/guzzle": "^7.8",
-        "elasticsearch/elasticsearch": "^8.0",
-        "predis/predis": "^2.2",
-        "ext-json": "*"
+        "php-amqplib/php-amqplib": "^3.6",
+        "nmred/kafka-php": "^0.3.0",
+        "ext-json": "*",
+        "ext-rdkafka": "*"
     },
     "autoload": {
         "psr-4": {
