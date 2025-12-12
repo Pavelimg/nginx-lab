@@ -1,73 +1,102 @@
 version: '3.8'
 services:
   nginx:
-    image: nginx:1.27-alpine
-    container_name: lab6_nginx
+    image: nginx:alpine
+    container_name: lab7_nginx
     ports:
-      - "8060:80"
+      - "8070:80"
     volumes:
       - ./www:/usr/share/nginx/html
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - php
-      - elasticsearch
+      - rabbitmq
+      - kafka
 
   php:
     build: .
-    container_name: lab6_php
+    container_name: lab7_php
     volumes:
       - ./www:/var/www/html
     expose:
       - "9000"
     depends_on:
-      - elasticsearch
-      - redis
-      - clickhouse
+      - rabbitmq
+      - kafka
+      - mysql
 
-  redis:
-    image: redis:7-alpine
-    container_name: lab6_redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
-    container_name: lab6_elastic
+  mysql:
+    image: mysql:8.0
+    container_name: lab7_mysql
     environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
-      - bootstrap.memory_lock=true
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: lab7_db
+      MYSQL_USER: lab7_user
+      MYSQL_PASSWORD: lab7_pass
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - "3308:3306"
     volumes:
-      - elastic_data:/usr/share/elasticsearch/data
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
-  clickhouse:
-    image: clickhouse/clickhouse-server:24-alpine
-    container_name: lab6_clickhouse
-    environment:
-      - CLICKHOUSE_DB=products_db
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: lab7_rabbitmq
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     volumes:
-      - clickhouse_data:/var/lib/clickhouse
+      - rabbitmq_data:/var/lib/rabbitmq
 
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.10.2
-    container_name: lab6_kibana
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: lab7_zookeeper
     environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ALLOW_ANONYMOUS_LOGIN=yes
+      - ZOO_ENABLE_AUTH=no
     ports:
-      - "5601:5601"
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/bitnami/zookeeper
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: lab7_kafka
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      - KAFKA_ENABLE_KRAFT=no
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9094
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9094
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
     depends_on:
-      - elasticsearch
+      - zookeeper
+    volumes:
+      - kafka_data:/bitnami/kafka
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: lab7_kafka_ui
+    ports:
+      - "8082:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=lab7-cluster
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+    depends_on:
+      - kafka
+      - zookeeper
 
 volumes:
-  redis_data:
-  elastic_data:
-  clickhouse_data:
+  mysql_data:
+  rabbitmq_data:
+  zookeeper_data:
+  kafka_data:
