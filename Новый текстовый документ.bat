@@ -1,12 +1,23 @@
-@echo off
-echo Проверка конфигурации Nginx...
-echo ============================================
-docker exec lab7_nginx nginx -t
+# Создаём исправленный конфиг локально
+(
+echo server {
+echo     listen 80;
+echo     server_name localhost;
+echo     root /usr/share/nginx/html;
+echo     index index.php index.html;
 echo.
-echo Текущий конфиг:
-echo ============================================
-docker exec lab7_nginx grep -A5 "location ~ \\.php\$" /etc/nginx/conf.d/default.conf
+echo     location / {
+echo         try_files $uri $uri/ /index.php?$query_string;
+echo     }
 echo.
-echo Проверка доступности PHP-FPM...
-docker exec lab7_nginx sh -c "SCRIPT_FILENAME=/usr/share/nginx/html/test_fix.php REQUEST_METHOD=GET timeout 5 cgi-fcgi -bind -connect php:9000 2>&1 | head -20"
-pause
+echo     location ~ \.php$ {
+echo         fastcgi_pass php:9000;
+echo         fastcgi_index index.php;
+echo         fastcgi_param SCRIPT_FILENAME /var/www/html$fastcgi_script_name;
+echo         include fastcgi_params;
+echo     }
+echo }
+) > nginx_correct.conf
+
+# Копируем в контейнер
+docker cp nginx_correct.conf lab7_nginx:/etc/nginx/conf.d/default.conf
