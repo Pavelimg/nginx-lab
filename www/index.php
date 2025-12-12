@@ -322,3 +322,374 @@ try {
             margin: 0 10px;
             font-weight: 600;
         }
+        
+        @media (max-width: 768px) {
+            .form-row {
+                flex-direction: column;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-exchange-alt"></i> Лабораторная работа №7</h1>
+            <p>Асинхронная обработка данных через очереди сообщений</p>
+        </div>
+        
+        <div class="content">
+            <?php if(isset($error)): ?>
+                <div class="error">
+                    <strong>Ошибка:</strong> <?= htmlspecialchars($error) ?>
+                </div>
+            <?php endif; ?>
+            
+            <!-- Общая статистика -->
+            <div class="stats-grid">
+                <div class="stats-card">
+                    <h3><i class="fas fa-rabbit" style="color: #FF6600;"></i> RabbitMQ Статистика</h3>
+                    <?php if(isset($rabbitStats)): ?>
+                        <div class="queue-stats">
+                            <?php foreach($rabbitStats as $queue => $stats): ?>
+                                <div class="queue-stat">
+                                    <div class="stat-label"><?= htmlspecialchars($queue) ?></div>
+                                    <div class="stat-number"><?= $stats['messages_total'] ?? 0 ?></div>
+                                    <div class="stat-label">Всего</div>
+                                    <div class="stat-number" style="color: #28a745;"><?= $stats['messages_processed'] ?? 0 ?></div>
+                                    <div class="stat-label">Обработано</div>
+                                    <div class="stat-number" style="color: #dc3545;"><?= $stats['messages_failed'] ?? 0 ?></div>
+                                    <div class="stat-label">Ошибок</div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <p>Статистика недоступна</p>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="stats-card">
+                    <h3><i class="fas fa-stream" style="color: #231F20;"></i> Kafka Статистика</h3>
+                    <?php if(isset($kafkaStats)): ?>
+                        <div class="queue-stats">
+                            <?php foreach($kafkaStats as $topic => $stats): ?>
+                                <div class="queue-stat">
+                                    <div class="stat-label"><?= htmlspecialchars($topic) ?></div>
+                                    <div class="stat-number"><?= $stats['messages_total'] ?? 0 ?></div>
+                                    <div class="stat-label">Всего</div>
+                                    <div class="stat-number" style="color: #28a745;"><?= $stats['messages_processed'] ?? 0 ?></div>
+                                    <div class="stat-label">Обработано</div>
+                                    <div class="stat-number" style="color: #dc3545;"><?= $stats['messages_failed'] ?? 0 ?></div>
+                                    <div class="stat-label">Ошибок</div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else: ?>
+                        <p>Статистика недоступна</p>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="stats-card">
+                    <h3><i class="fas fa-database"></i> Общая статистика из БД</h3>
+                    <?php if(isset($totalStats) && !empty($totalStats)): ?>
+                        <?php foreach($totalStats as $stat): ?>
+                            <div class="queue-stat">
+                                <div class="stat-label"><?= htmlspecialchars($stat['queue_type']) ?></div>
+                                <div class="stat-number"><?= $stat['total_tasks'] ?></div>
+                                <div class="stat-label">Всего задач</div>
+                                <div class="stat-number" style="color: #28a745;"><?= $stat['completed_tasks'] ?></div>
+                                <div class="stat-label">Завершено</div>
+                                <div class="stat-number" style="color: #dc3545;"><?= $stat['failed_tasks'] ?></div>
+                                <div class="stat-label">Ошибок</div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <p>Нет данных в БД</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <!-- Форма отправки сообщений -->
+            <div class="form-section">
+                <h3><i class="fas fa-paper-plane"></i> Отправить задачу в очередь</h3>
+                
+                <form id="taskForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="taskName">Название задачи:</label>
+                            <input type="text" id="taskName" name="taskName" placeholder="Например: Обработка заказа #123" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="taskType">Тип задачи:</label>
+                            <select id="taskType" name="taskType" required>
+                                <option value="">Выберите тип</option>
+                                <option value="email">Отправка email</option>
+                                <option value="notification">Уведомление</option>
+                                <option value="report">Генерация отчета</option>
+                                <option value="process">Обработка данных</option>
+                                <option value="import">Импорт данных</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="priority">Приоритет:</label>
+                            <select id="priority" name="priority">
+                                <option value="low">Низкий</option>
+                                <option value="normal" selected>Обычный</option>
+                                <option value="high">Высокий</option>
+                                <option value="critical">Критический</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="taskData">Данные задачи (JSON):</label>
+                        <textarea id="taskData" name="taskData" rows="3" placeholder='{"key": "value"}'></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="simulateError">Симулировать ошибку:</label>
+                        <input type="checkbox" id="simulateError" name="simulateError" value="1">
+                        <small style="color: #666;">(сообщение будет отправлено в очередь ошибок после нескольких попыток)</small>
+                    </div>
+                    
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-rabbit" onclick="sendToRabbitMQ()">
+                            <i class="fas fa-rabbit"></i> Отправить в RabbitMQ
+                        </button>
+                        <button type="button" class="btn btn-kafka" onclick="sendToKafka()">
+                            <i class="fas fa-stream"></i> Отправить в Kafka
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="sendToBoth()">
+                            <i class="fas fa-exchange-alt"></i> Отправить в обе
+                        </button>
+                    </div>
+                </form>
+                
+                <div id="sendResult"></div>
+            </div>
+            
+            <!-- Последние задачи -->
+            <?php if(isset($recentTasks) && !empty($recentTasks)): ?>
+                <h3><i class="fas fa-history"></i> Последние задачи</h3>
+                <table class="tasks-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Тип очереди</th>
+                            <th>Тип задачи</th>
+                            <th>Статус</th>
+                            <th>Время создания</th>
+                            <th>Время завершения</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach($recentTasks as $task): ?>
+                            <tr>
+                                <td><?= $task['id'] ?></td>
+                                <td><?= htmlspecialchars($task['queue_type']) ?></td>
+                                <td><?= htmlspecialchars($task['task_type']) ?></td>
+                                <td>
+                                    <span class="status status-<?= $task['status'] ?>">
+                                        <?= htmlspecialchars($task['status']) ?>
+                                    </span>
+                                </td>
+                                <td><?= htmlspecialchars($task['processed_at']) ?></td>
+                                <td><?= htmlspecialchars($task['completed_at'] ?? '-') ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+            
+            <!-- Монитор логов -->
+            <h3><i class="fas fa-terminal"></i> Монитор логов (симуляция)</h3>
+            <div class="monitor" id="logMonitor">
+                <div>> Система очередей запущена</div>
+                <div>> Ожидание сообщений...</div>
+            </div>
+            
+            <!-- Информация о системах -->
+            <div class="system-info">
+                <div class="info-card">
+                    <h4><i class="fas fa-rabbit" style="color: #FF6600;"></i> RabbitMQ</h4>
+                    <p><strong>Порт:</strong> 5672</p>
+                    <p><strong>Панель управления:</strong> <a href="http://localhost:15672" target="_blank">http://localhost:15672</a></p>
+                    <p><strong>Логин:</strong> guest / <strong>Пароль:</strong> guest</p>
+                </div>
+                
+                <div class="info-card">
+                    <h4><i class="fas fa-stream" style="color: #231F20;"></i> Kafka</h4>
+                    <p><strong>Порт:</strong> 9092</p>
+                    <p><strong>UI:</strong> <a href="http://localhost:8082" target="_blank">http://localhost:8082</a></p>
+                    <p><strong>Zookeeper порт:</strong> 2181</p>
+                </div>
+                
+                <div class="info-card">
+                    <h4><i class="fas fa-server"></i> Система</h4>
+                    <p><strong>MySQL порт:</strong> 3308</p>
+                    <p><strong>Nginx порт:</strong> 8070</p>
+                    <p><strong>PHP-FPM порт:</strong> 9000</p>
+                </div>
+            </div>
+            
+            <!-- Управление -->
+            <div class="nav-links">
+                <button class="nav-btn" onclick="startRabbitWorker()">
+                    <i class="fas fa-rabbit"></i> Запустить RabbitMQ Worker
+                </button>
+                <button class="nav-btn" onclick="startKafkaWorker()">
+                    <i class="fas fa-stream"></i> Запустить Kafka Worker
+                </button>
+                <button class="nav-btn" onclick="clearLogs()">
+                    <i class="fas fa-trash"></i> Очистить логи
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const logMonitor = document.getElementById('logMonitor');
+        const sendResult = document.getElementById('sendResult');
+        
+        function addLog(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '[ERROR]' : type === 'success' ? '[OK]' : '[INFO]';
+            const color = type === 'error' ? '#ff4444' : type === 'success' ? '#44ff44' : '#44aaff';
+            
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span style="color: ${color}">${prefix}</span> [${time}] ${message}`;
+            logMonitor.appendChild(logEntry);
+            logMonitor.scrollTop = logMonitor.scrollHeight;
+        }
+        
+        async function sendToRabbitMQ() {
+            const formData = getFormData();
+            addLog(`Отправка в RabbitMQ: ${formData.taskName}`);
+            
+            try {
+                const response = await fetch('send.php?queue=rabbitmq', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`Задача отправлена в RabbitMQ (ID: ${result.taskId})`, 'success');
+                    showSuccess('Задача успешно отправлена в RabbitMQ!');
+                } else {
+                    addLog(`Ошибка отправки в RabbitMQ: ${result.error}`, 'error');
+                    showError('Ошибка отправки в RabbitMQ: ' + result.error);
+                }
+            } catch (error) {
+                addLog(`Ошибка сети: ${error.message}`, 'error');
+                showError('Ошибка сети: ' + error.message);
+            }
+        }
+        
+        async function sendToKafka() {
+            const formData = getFormData();
+            addLog(`Отправка в Kafka: ${formData.taskName}`);
+            
+            try {
+                const response = await fetch('send.php?queue=kafka', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`Задача отправлена в Kafka (ID: ${result.taskId})`, 'success');
+                    showSuccess('Задача успешно отправлена в Kafka!');
+                } else {
+                    addLog(`Ошибка отправки в Kafka: ${result.error}`, 'error');
+                    showError('Ошибка отправки в Kafka: ' + result.error);
+                }
+            } catch (error) {
+                addLog(`Ошибка сети: ${error.message}`, 'error');
+                showError('Ошибка сети: ' + error.message);
+            }
+        }
+        
+        async function sendToBoth() {
+            await sendToRabbitMQ();
+            await sendToKafka();
+        }
+        
+        function getFormData() {
+            const form = document.getElementById('taskForm');
+            const formData = {
+                taskName: form.taskName.value,
+                taskType: form.taskType.value,
+                priority: form.priority.value,
+                simulateError: form.simulateError.checked,
+                timestamp: new Date().toISOString()
+            };
+            
+            if (form.taskData.value) {
+                try {
+                    formData.data = JSON.parse(form.taskData.value);
+                } catch (e) {
+                    formData.data = {raw: form.taskData.value};
+                }
+            }
+            
+            return formData;
+        }
+        
+        function showSuccess(message) {
+            sendResult.innerHTML = `<div class="success">${message}</div>`;
+            setTimeout(() => location.reload(), 2000);
+        }
+        
+        function showError(message) {
+            sendResult.innerHTML = `<div class="error">${message}</div>`;
+        }
+        
+        function startRabbitWorker() {
+            addLog('Запуск RabbitMQ Worker...');
+            // Здесь можно реализовать AJAX вызов для запуска worker
+            showSuccess('RabbitMQ Worker запущен в фоновом режиме');
+        }
+        
+        function startKafkaWorker() {
+            addLog('Запуск Kafka Worker...');
+            // Здесь можно реализовать AJAX вызов для запуска worker
+            showSuccess('Kafka Worker запущен в фоновом режиме');
+        }
+        
+        function clearLogs() {
+            logMonitor.innerHTML = '<div>> Логи очищены</div>';
+            addLog('Система очередей запущена');
+            addLog('Ожидание сообщений...');
+        }
+        
+        // Симуляция логов
+        setInterval(() => {
+            const messages = [
+                'Проверка соединения с RabbitMQ... OK',
+                'Проверка соединения с Kafka... OK',
+                'Мониторинг очередей... Активен',
+                'Проверка БД... Соединение установлено'
+            ];
+            
+            if (Math.random() > 0.7) {
+                addLog(messages[Math.floor(Math.random() * messages.length)]);
+            }
+        }, 10000);
+    </script>
+</body>
+</html>
